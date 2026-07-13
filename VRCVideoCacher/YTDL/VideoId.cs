@@ -116,7 +116,8 @@ public class VideoId
         return data.Id;
     }
 
-    public static async Task<string> GetURLResonite(string url)
+    // Full yt-dlp -J metadata dump, used by clients that pick their own format (Resonite, ChilloutVR)
+    public static async Task<string> GetUrlJson(string url)
     {
         var args = new List<string>();
         if (!string.IsNullOrEmpty(ConfigManager.Config.YtdlpDubLanguage))

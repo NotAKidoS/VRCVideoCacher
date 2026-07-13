@@ -137,6 +137,7 @@
 
                         <CheckBox IsChecked="{Binding PatchVRC}" Content="{l:Localize PatchVRChat}"/>
                         <CheckBox IsChecked="{Binding PatchResonite}" Content="{l:Localize PatchResonite}"/>
+                        <CheckBox IsChecked="{Binding PatchChilloutVR}" Content="{l:Localize PatchChilloutVR}"/>
                     </StackPanel>
                 </Border>
 

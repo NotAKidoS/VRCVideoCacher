@@ -16,6 +16,8 @@ public class ConfigManager
 
     // Events for UI
     public static event Action? OnConfigChanged;
+    
+    public static bool IsFirstRunSetupPending { get; set; }
 
     static ConfigManager()
     {
@@ -43,8 +45,19 @@ public class ConfigManager
             {
                 Language = GetSystemLanguage()
             };
-            if (!LaunchArgs.HasGui)
+            if (LaunchArgs.HasGui)
+            {
+                // Don't patch anything until the user confirms in the first run setup window
+                Config.PatchVrChat = false;
+                Config.PatchResonite = false;
+                Config.PatchChilloutVR = false;
+                IsFirstRunSetupPending = true;
+            }
+            else
+            {
+                DetectInstalledGames();
                 FirstRunConsole();
+            }
         }
         else
         {
@@ -104,7 +117,9 @@ public class ConfigManager
             Config.CacheVrDancing = vrDancingPyPyChoice;
             Config.CachePyPyDance = vrDancingPyPyChoice;
 
-            Config.PatchResonite = GetUserConfirmation("Would you like to enable Resonite support?", false);
+            Config.PatchVrChat = GetUserConfirmation("Would you like to enable VRChat support?", Config.PatchVrChat);
+            Config.PatchResonite = GetUserConfirmation("Would you like to enable Resonite support?", Config.PatchResonite);
+            Config.PatchChilloutVR = GetUserConfirmation("Would you like to enable ChilloutVR support?", Config.PatchChilloutVR);
         }
 
         if (OperatingSystem.IsWindows() && GetUserConfirmation("Would you like to add VRCVideoCacher to VRCX auto start?", true))
@@ -117,6 +132,17 @@ public class ConfigManager
         Log.Information("Firefox: https://addons.mozilla.org/en-US/firefox/addon/vrcvideocachercookiesexporter/");
         Log.Information("More info: https://github.com/clienthax/VRCVideoCacherBrowserExtension");
         TrySaveConfig();
+    }
+
+    private static void DetectInstalledGames()
+    {
+        Config.PatchVrChat = FileTools.IsVrChatInstalled;
+        Config.PatchResonite = FileTools.IsResoniteInstalled;
+        Config.PatchChilloutVR = FileTools.IsChilloutVRInstalled;
+        Log.Information(
+            "Detected installed games - VRChat: {VRChat}, Resonite: {Resonite}, ChilloutVR: {ChilloutVR}. " +
+            "You can change which games are patched at any time in Settings.",
+            Config.PatchVrChat, Config.PatchResonite, Config.PatchChilloutVR);
     }
 
     private static string GetSystemLanguage()
@@ -154,6 +180,8 @@ public class ConfigModel
     // Patching
     public bool PatchResonite = false;
     public string ResonitePath = "";
+    public bool PatchChilloutVR = false;
+    public string ChilloutVRPath = "";
     public bool PatchVrChat = true;
 
     // Video Cacher

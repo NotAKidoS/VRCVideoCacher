@@ -66,7 +66,13 @@ public class ApiController : WebApiController
         var requestUrl = Request.QueryString["url"]?.Replace("\"", "%22").Trim();
         var avPro = string.Compare(Request.QueryString["avpro"], "true", StringComparison.OrdinalIgnoreCase) == 0;
         var source = Request.QueryString["source"];
+        var dumpJson = string.Compare(Request.QueryString["dumpJson"], "true", StringComparison.OrdinalIgnoreCase) == 0;
 
+        // Ideally things shouldn't be hardcoded to a specific app. In the case an app is requesting specific
+        // YT-DLP arguments, it would likely be best to generalize it and pass them up to here for handling.
+        // Source is still being passed for convenience and logging, but if anything is built on top of it,
+        // you'll end up with per-app garbo like VRCFaceTracking: https://github.com/benaclejames/VRCFaceTracking/pull/300
+        
         if (string.IsNullOrEmpty(requestUrl))
         {
             Log.Warning("No URL provided.");
@@ -74,7 +80,7 @@ public class ApiController : WebApiController
             return;
         }
 
-        Log.Information("Request URL: {URL}", requestUrl);
+        Log.Information("Request URL: {URL}, Source: {Source}, DumpJson: {DumpJson}", requestUrl, source, dumpJson);
 
         if (requestUrl.StartsWith("https://eu2.vrdancing.club/weekend/") && ConfigManager.Config.RedirectVRDancing)
         {
@@ -120,14 +126,8 @@ public class ApiController : WebApiController
             Log.Information("Failed to get Video Info for URL: {URL}", requestUrl);
             return;
         }
-        DatabaseManager.AddPlayHistory(videoInfo);
 
-        if (source == "resonite")
-        {
-            Log.Information("Request sent from resonite sending json.");
-            await HttpContext.SendStringAsync(await VideoId.GetURLResonite(videoInfo.VideoUrl), "text/plain", Encoding.UTF8);
-            return;
-        }
+        DatabaseManager.AddPlayHistory(videoInfo);
 
         var (isCached, filePath, fileName) = GetCachedFile(videoInfo.VideoId, avPro);
         if (isCached)
@@ -135,7 +135,27 @@ public class ApiController : WebApiController
             File.SetLastWriteTimeUtc(filePath, DateTime.UtcNow);
             var url = $"{ConfigManager.Config.YtdlpWebServerUrl}/{fileName}";
             Log.Information("Responding with Cached URL: {URL}", url);
-            await HttpContext.SendStringAsync(url, "text/plain", Encoding.UTF8);
+
+            if (dumpJson)
+                await HttpContext.SendStringAsync(BuildCachedVideoJson(videoInfo, url, fileName), "text/plain", Encoding.UTF8);
+            else
+                await HttpContext.SendStringAsync(url, "text/plain", Encoding.UTF8);
+
+            return;
+        }
+
+        if (dumpJson)
+        {
+            if (ConfigManager.Config.CacheOnly)
+            {
+                Log.Information("Cache Only Mode Enabled: Bypassing.");
+                await HttpContext.SendStringAsync(string.Empty, "text/plain", Encoding.UTF8);
+                return;
+            }
+
+            Log.Information("Request sent from {Source}, sending json.", source);
+            await HttpContext.SendStringAsync(await VideoId.GetUrlJson(videoInfo.VideoUrl), "text/plain", Encoding.UTF8);
+            QueueCacheDownload(videoInfo, avPro);
             return;
         }
 
@@ -189,8 +209,17 @@ public class ApiController : WebApiController
         if (videoInfo.VideoId.Equals("live"))
             return;
 
+        QueueCacheDownload(videoInfo, avPro);
+    }
+
+    private static void QueueCacheDownload(VideoInfo videoInfo, bool avPro)
+    {
+        if (string.IsNullOrEmpty(videoInfo.VideoId) 
+            || videoInfo.VideoId.Equals("live"))
+            return;
+
         // check if file is cached again to handle race condition
-        (isCached, _, _) = GetCachedFile(videoInfo.VideoId, avPro);
+        (bool isCached, _, _) = GetCachedFile(videoInfo.VideoId, avPro);
         if (!isCached && (
                 (videoInfo.UrlType == UrlType.YouTube && ConfigManager.Config.CacheYouTube) ||
                 (videoInfo.UrlType == UrlType.PyPyDance && ConfigManager.Config.CachePyPyDance) ||
@@ -198,6 +227,47 @@ public class ApiController : WebApiController
         {
             VideoDownloader.QueueDownload(videoInfo);
         }
+    }
+
+    // Minimal yt-dlp-shaped info json pointing at a locally cached file, for clients that expect -J output.
+    private static string BuildCachedVideoJson(VideoInfo videoInfo, string url, string fileName)
+    {
+        var ext = Path.GetExtension(fileName).TrimStart('.');
+        var vcodec = ext == "webm" ? "vp9" : "h264";
+        var acodec = ext == "webm" ? "opus" : "aac";
+        var cache = DatabaseManager.GetVideoInfoCache(videoInfo.VideoId);
+
+        using var stream = new MemoryStream();
+        using (var writer = new System.Text.Json.Utf8JsonWriter(stream))
+        {
+            writer.WriteStartObject();
+            writer.WriteString("id", videoInfo.VideoId);
+            writer.WriteString("title", cache?.Title ?? videoInfo.VideoId);
+            if (cache?.Duration != null)
+                writer.WriteNumber("duration", cache.Duration.Value);
+            writer.WriteString("webpage_url", videoInfo.VideoUrl);
+            writer.WriteString("extractor", "VRCVideoCacher");
+
+            void WriteFormatFields(System.Text.Json.Utf8JsonWriter w)
+            {
+                w.WriteString("format_id", "vvc-cached");
+                w.WriteString("format", "vvc-cached - VRCVideoCacher local cache");
+                w.WriteString("url", url);
+                w.WriteString("ext", ext);
+                w.WriteString("protocol", "http");
+                w.WriteString("vcodec", vcodec);
+                w.WriteString("acodec", acodec);
+            }
+
+            WriteFormatFields(writer);
+            writer.WriteStartArray("formats");
+            writer.WriteStartObject();
+            WriteFormatFields(writer);
+            writer.WriteEndObject();
+            writer.WriteEndArray();
+            writer.WriteEndObject();
+        }
+        return Encoding.UTF8.GetString(stream.ToArray());
     }
 
     private static (bool isCached, string filePath, string fileName) GetCachedFile(string videoId, bool avPro)
