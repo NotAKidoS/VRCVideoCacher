@@ -26,7 +26,8 @@ public class FileTools
         }
         else
         {
-            var path = GetResonitePath();
+            const string ResoniteAppId = "2519830";
+            var path = GetSteamGamePath(ResoniteAppId);
             if (string.IsNullOrEmpty(path))
             {
                 Log.Warning("Unable to find Resonite path, Resonite patching will be unavailable.");
@@ -50,7 +51,8 @@ public class FileTools
         }
         else
         {
-            var path = GetSteamGamePath("661130");
+            const string ChilloutVRAppId = "661130";
+            var path = GetSteamGamePath(ChilloutVRAppId);
             if (string.IsNullOrEmpty(path))
             {
                 Log.Warning("Unable to find ChilloutVR path, ChilloutVR patching will be unavailable.");
@@ -91,11 +93,6 @@ public class FileTools
             YtdlPathVrc = vrcPath;
             BackupPathVrc = $"{vrcPath}.bkp";
         }
-    }
-
-    private static string? GetResonitePath()
-    {
-        return GetSteamGamePath("2519830");
     }
 
     private static string? GetSteamGamePath(string appid)

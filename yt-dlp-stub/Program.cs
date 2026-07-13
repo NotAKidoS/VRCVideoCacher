@@ -55,10 +55,7 @@ internal static class Program
             
             // ChilloutVR arguments:
             // -f --no-playlist --dump-json
-
-            // TODO: Verify HDR videos don't crash CVR anymore. As the arguments used by the source app are not fully respected,
-            // we may be returning videos which the app tries to explicitly prevent from being loaded (need ask kafe).
-
+            
             if (arg.Equals("-J", StringComparison.OrdinalIgnoreCase) ||
                 arg.StartsWith("--dump-json", StringComparison.OrdinalIgnoreCase) ||
                 arg.StartsWith("--dump-single-json", StringComparison.OrdinalIgnoreCase))
