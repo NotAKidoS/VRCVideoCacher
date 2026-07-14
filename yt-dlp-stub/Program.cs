@@ -5,7 +5,7 @@ namespace yt_dlp;
 
 internal static class Program
 {
-    private static string _logFilePath = string.Empty;
+    private static readonly string LogFilePath = GetLogFilePath();
     private const string BaseUrl = "http://127.0.0.1:9696";
     
     private static class SourceApps
@@ -16,27 +16,10 @@ internal static class Program
         public const string ChilloutVR = "chilloutvr";
     }
 
-    private static void WriteLog(string message)
-    {
-        if (string.IsNullOrEmpty(_logFilePath))
-            return;
-
-        try
-        {
-            using var sw = new StreamWriter(_logFilePath, true);
-            sw.WriteLine($"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {message}");
-        }
-        catch
-        {
-            // ignore
-        }
-    }
-
     public static async Task Main(string[] args)
     {
         string processPath = Environment.ProcessPath ?? string.Empty;
         string source = GetSourceApp(processPath);
-        _logFilePath = GetYtdlpLogFilePath(source);
 
         string url = string.Empty;
         bool avPro = true;
@@ -125,23 +108,40 @@ internal static class Program
         
         return SourceApps.Unknown;
     }
-
-    // Seems silly to write to VRChats log file... ?
-    // I assume this is for debugging or VRCX to parse, but not sure as source wasn't commented :(
-    private static string GetYtdlpLogFilePath(string source)
+    
+    // debug logging
+    
+    private static string GetLogFilePath()
     {
-        if (source == SourceApps.VRChat)
+        try
         {
-            string localLow = Path.Combine(
-                Directory.GetParent(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData))!.FullName,
-                "LocalLow");
-
-            string appDataPath = Path.Combine(localLow, "VRChat", "VRChat", "Tools");
-            Directory.CreateDirectory(appDataPath);
-            return Path.Combine(appDataPath, "ytdl.log");
+            string logPath = Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), 
+                "VRCVideoCacher", 
+                "Logs");
+            
+            Directory.CreateDirectory(logPath);
+            return Path.Combine(logPath, "yt-dlp-stub.log");
         }
+        catch
+        {
+            return string.Empty;
+        }
+    }
+    
+    private static void WriteLog(string message)
+    {
+        if (string.IsNullOrEmpty(LogFilePath))
+            return;
 
-        // Not writing to other apps log files
-        return string.Empty;
+        try
+        {
+            using var sw = new StreamWriter(LogFilePath, true);
+            sw.WriteLine($"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {message}");
+        }
+        catch
+        {
+            // ignore
+        }
     }
 }
