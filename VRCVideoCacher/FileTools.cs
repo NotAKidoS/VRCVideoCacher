@@ -13,6 +13,8 @@ public class FileTools
     private static readonly string? BackupPathVrc;
     private static readonly string? YtdlPathReso;
     private static readonly string? BackupPathReso;
+    private static readonly string? YtdlPathCvr;
+    private static readonly string? BackupPathCvr;
     private static readonly ImmutableList<string> SteamPaths = [".var/app/com.valvesoftware.Steam", ".steam/steam", ".local/share/Steam"];
 
     static FileTools()
@@ -24,10 +26,11 @@ public class FileTools
         }
         else
         {
-            var path = GetResonitePath();
+            const string ResoniteAppId = "2519830";
+            var path = GetSteamGamePath(ResoniteAppId);
             if (string.IsNullOrEmpty(path))
             {
-                Log.Warning("Unable to find Resonite path at: {path}, Resonite patching will be unavailable.", path);
+                Log.Warning("Unable to find Resonite path, Resonite patching will be unavailable.");
                 resoPath = string.Empty;
             }
             else
@@ -39,6 +42,31 @@ public class FileTools
         {
             YtdlPathReso = $@"{resoPath}\RuntimeData\yt-dlp.exe";
             BackupPathReso = $"{YtdlPathReso}.bkp";
+        }
+
+        string cvrPath;
+        if (!string.IsNullOrEmpty(ConfigManager.Config.ChilloutVRPath))
+        {
+            cvrPath = ConfigManager.Config.ChilloutVRPath;
+        }
+        else
+        {
+            const string ChilloutVRAppId = "661130";
+            var path = GetSteamGamePath(ChilloutVRAppId);
+            if (string.IsNullOrEmpty(path))
+            {
+                Log.Warning("Unable to find ChilloutVR path, ChilloutVR patching will be unavailable.");
+                cvrPath = string.Empty;
+            }
+            else
+            {
+                cvrPath = $@"{path}\steamapps\common\ChilloutVR";
+            }
+        }
+        if (!string.IsNullOrEmpty(cvrPath))
+        {
+            YtdlPathCvr = $@"{cvrPath}\ChilloutVR_Data\youtube-dl.exe";
+            BackupPathCvr = $"{YtdlPathCvr}.bkp";
         }
 
         string localLowPath;
@@ -67,21 +95,23 @@ public class FileTools
         }
     }
 
-    private static string? GetResonitePath()
+    private static string? GetSteamGamePath(string appid)
     {
-        const string appid = "2519830";
         if (!OperatingSystem.IsWindows())
         {
-            Log.Warning("GetResonitePath is currently only supported on Windows");
+            Log.Warning("GetSteamGamePath is currently only supported on Windows");
             return null;
         }
         const string libraryFolders = @"C:\Program Files (x86)\Steam\steamapps\libraryfolders.vdf";
         if (!Path.Exists(libraryFolders))
         {
-            Log.Warning("GetResonitePath: Steam libraryfolders.vdf not found at expected location: {Path}", libraryFolders);
+            Log.Warning("GetSteamGamePath: Steam libraryfolders.vdf not found at expected location: {Path}", libraryFolders);
             return null;
         }
 
+        // There is an edge case where if the game was just installed it will not be detected with this method.
+        // I needed to restart Steam after installing Resonite for it to be detected by VRCVideoCacher.
+        
         try
         {
             var stream = File.OpenRead(libraryFolders);
@@ -97,7 +127,7 @@ public class FileTools
         }
         catch (Exception e)
         {
-            Log.Warning("GetResonitePath: Exception while reading libraryfolders.vdf: {Error}", e.Message);
+            Log.Warning("GetSteamGamePath: Exception while reading libraryfolders.vdf: {Error}", e.Message);
         }
 
         return null;
@@ -172,27 +202,54 @@ public class FileTools
         }
     }
 
+    public static bool IsVrChatInstalled => !string.IsNullOrEmpty(YtdlPathVrc);
+    public static bool IsResoniteInstalled => !string.IsNullOrEmpty(YtdlPathReso);
+    public static bool IsChilloutVRInstalled => !string.IsNullOrEmpty(YtdlPathCvr);
+
     public static void BackupAllYtdl()
     {
-        if (ConfigManager.Config.PatchVrChat)
+        SyncYtdlPatch(ConfigManager.Config.PatchVrChat, YtdlPathVrc, BackupPathVrc, "VRChat");
+        SyncYtdlPatch(ConfigManager.Config.PatchResonite, YtdlPathReso, BackupPathReso, "Resonite");
+        SyncYtdlPatch(ConfigManager.Config.PatchChilloutVR, YtdlPathCvr, BackupPathCvr, "ChilloutVR");
+    }
+
+    private static void SyncYtdlPatch(bool enabled, string? ytdlPath, string? backupPath, string gameName)
+    {
+        try
         {
-            if (!BackupAndReplaceYtdl(YtdlPathVrc, BackupPathVrc))
-                Log.Error("Can't find VRC data, it may not be installed. {Path}", YtdlPathVrc);
+            if (!enabled)
+            {
+                RestoreYtdl(ytdlPath, backupPath, gameName);
+                return;
+            }
+            if (string.IsNullOrEmpty(ytdlPath))
+            {
+                Log.Warning("{Game} doesn't appear to be installed, skipping patching. " +
+                            "If it is installed you can set its path manually in the config file.", gameName);
+                return;
+            }
+            if (!BackupAndReplaceYtdl(ytdlPath, backupPath, gameName))
+                Log.Error("Failed to patch yt-dlp for {Game}. {Path}", gameName, ytdlPath);
         }
-        if (ConfigManager.Config.PatchResonite)
+        catch (UnauthorizedAccessException)
         {
-            if (!BackupAndReplaceYtdl(YtdlPathReso, BackupPathReso))
-                Log.Warning("Can't find Resonite data, it may not be installed. {Path}", YtdlPathVrc);
+            Log.Error("Access denied while patching yt-dlp for {Game} at {Path}. " +
+                      "Try running VRCVideoCacher as administrator.", gameName, ytdlPath);
+        }
+        catch (Exception ex)
+        {
+            Log.Error("Failed to patch yt-dlp for {Game} at {Path}: {Error}", gameName, ytdlPath, ex.Message);
         }
     }
 
     public static void RestoreAllYtdl()
     {
-        RestoreYtdl(YtdlPathVrc, BackupPathVrc);
-        RestoreYtdl(YtdlPathReso, BackupPathReso);
+        RestoreYtdl(YtdlPathVrc, BackupPathVrc, "VRChat");
+        RestoreYtdl(YtdlPathReso, BackupPathReso, "Resonite");
+        RestoreYtdl(YtdlPathCvr, BackupPathCvr, "ChilloutVR");
     }
 
-    private static bool BackupAndReplaceYtdl(string? ytdlPath, string? backupPath)
+    private static bool BackupAndReplaceYtdl(string? ytdlPath, string? backupPath, string gameName)
     {
         if (string.IsNullOrEmpty(ytdlPath) ||
             string.IsNullOrEmpty(backupPath) ||
@@ -205,7 +262,7 @@ public class FileTools
             var hash = Program.ComputeBinaryContentHash(File.ReadAllBytes(ytdlPath));
             if (hash == Program.YtdlpHash)
             {
-                Log.Information("YT-DLP is already patched.");
+                Log.Information("YT-DLP is already patched for {Game}.", gameName);
                 return true;
             }
             if (File.Exists(backupPath))
@@ -214,7 +271,7 @@ public class FileTools
                 File.Delete(backupPath);
             }
             File.Move(ytdlPath, backupPath);
-            Log.Information("Backed up YT-DLP.");
+            Log.Information("Backed up YT-DLP for {Game}.", gameName);
         }
         using var stream = Program.GetYtDlpStub();
         using var fileStream = File.Create(ytdlPath);
@@ -223,18 +280,18 @@ public class FileTools
         var attr = File.GetAttributes(ytdlPath);
         attr |= FileAttributes.ReadOnly;
         File.SetAttributes(ytdlPath, attr);
-        Log.Information("Patched YT-DLP.");
+        Log.Information("Patched YT-DLP for {Game}.", gameName);
         return true;
     }
 
-    private static void RestoreYtdl(string? ytdlPath, string? backupPath)
+    private static void RestoreYtdl(string? ytdlPath, string? backupPath, string gameName)
     {
         if (string.IsNullOrEmpty(ytdlPath) ||
             string.IsNullOrEmpty(backupPath) ||
             !File.Exists(backupPath))
             return;
 
-        Log.Information("Restoring yt-dlp...");
+        Log.Information("Restoring yt-dlp for {Game}...", gameName);
         if (File.Exists(ytdlPath))
         {
             File.SetAttributes(ytdlPath, FileAttributes.Normal);
@@ -244,6 +301,6 @@ public class FileTools
         var attr = File.GetAttributes(ytdlPath);
         attr &= ~FileAttributes.ReadOnly;
         File.SetAttributes(ytdlPath, attr);
-        Log.Information("Restored YT-DLP.");
+        Log.Information("Restored YT-DLP for {Game}.", gameName);
     }
 }

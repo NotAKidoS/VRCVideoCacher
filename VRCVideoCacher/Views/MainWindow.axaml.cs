@@ -34,6 +34,16 @@ public partial class MainWindow : Window
             Program.InitializeUIBackend();
         });
 
+        // On first launch let the user pick which games to patch and what to cache
+        if (ConfigManager.IsFirstRunSetupPending)
+        {
+            await Dispatcher.UIThread.InvokeAsync(async () =>
+            {
+                await Task.Delay(500);
+                await ShowFirstRunSetupDialog();
+            });
+        }
+
         // Check if we should show the cookie setup wizard
         // Show if: cookies are enabled, setup not completed, and cookies not already valid
         if (ConfigManager.Config.YtdlpUseCookies &&
@@ -47,6 +57,19 @@ public partial class MainWindow : Window
                 await ShowCookieSetupDialog();
             });
         }
+    }
+
+    private async Task ShowFirstRunSetupDialog()
+    {
+        var viewModel = new FirstRunSetupViewModel();
+        var window = new FirstRunSetupWindow
+        {
+            DataContext = viewModel
+        };
+
+        viewModel.RequestClose += () => window.Close();
+
+        await window.ShowDialog(this);
     }
 
     private async Task ShowCookieSetupDialog()

@@ -134,9 +134,21 @@
                 <Border Background="#2d2d2d" CornerRadius="8" Padding="20">
                     <StackPanel Spacing="15">
                         <TextBlock Text="{l:Localize GamePatching}" FontWeight="SemiBold" FontSize="16"/>
-
-                        <CheckBox IsChecked="{Binding PatchVRC}" Content="{l:Localize PatchVRChat}"/>
-                        <CheckBox IsChecked="{Binding PatchResonite}" Content="{l:Localize PatchResonite}"/>
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <CheckBox IsChecked="{Binding PatchVRC}" Content="{l:Localize PatchVRChat}"/>
+                            <TextBlock Text="{l:Localize GameNotDetected}" Foreground="#888888"
+                                       VerticalAlignment="Center" IsVisible="{Binding IsVrChatNotDetected}"/>
+                        </StackPanel>
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <CheckBox IsChecked="{Binding PatchResonite}" Content="{l:Localize PatchResonite}"/>
+                            <TextBlock Text="{l:Localize GameNotDetected}" Foreground="#888888"
+                                       VerticalAlignment="Center" IsVisible="{Binding IsResoniteNotDetected}"/>
+                        </StackPanel>
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <CheckBox IsChecked="{Binding PatchChilloutVR}" Content="{l:Localize PatchChilloutVR}"/>
+                            <TextBlock Text="{l:Localize GameNotDetected}" Foreground="#888888"
+                                       VerticalAlignment="Center" IsVisible="{Binding IsChilloutVRNotDetected}"/>
+                        </StackPanel>    
                     </StackPanel>
                 </Border>
 

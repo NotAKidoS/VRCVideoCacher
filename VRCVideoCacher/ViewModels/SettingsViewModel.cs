@@ -73,11 +73,17 @@ public partial class SettingsViewModel : ViewModelBase
 
     // Patching
     [ObservableProperty]
+    private bool _patchVRC;
+    public bool IsVrChatNotDetected => !FileTools.IsVrChatInstalled;
+    
+    [ObservableProperty]
     private bool _patchResonite;
+    public bool IsResoniteNotDetected => !FileTools.IsResoniteInstalled;
 
     [ObservableProperty]
-    private bool _patchVRC;
-
+    private bool _patchChilloutVR;
+    public bool IsChilloutVRNotDetected => !FileTools.IsChilloutVRInstalled;
+    
     [ObservableProperty]
     private bool _redirectVRDancing;
 
@@ -162,6 +168,7 @@ public partial class SettingsViewModel : ViewModelBase
         CacheVRDancing = config.CacheVrDancing;
         CacheOnly = config.CacheOnly;
         PatchResonite = config.PatchResonite;
+        PatchChilloutVR = config.PatchChilloutVR;
         PatchVRC = config.PatchVrChat;
         AutoUpdate = config.AutoUpdateVrcVideoCacher;
         CloseToTray = config.CloseToTray;
@@ -240,6 +247,7 @@ public partial class SettingsViewModel : ViewModelBase
     partial void OnCacheVRDancingChanged(bool value) => SetHasChanges();
     partial void OnCacheOnlyChanged(bool value) => SetHasChanges();
     partial void OnPatchResoniteChanged(bool value) => SetHasChanges();
+    partial void OnPatchChilloutVRChanged(bool value) => SetHasChanges();
     partial void OnPatchVRCChanged(bool value) => SetHasChanges();
     partial void OnAutoUpdateChanged(bool value) => SetHasChanges();
     partial void OnCloseToTrayChanged(bool value) => SetHasChanges();
@@ -252,6 +260,10 @@ public partial class SettingsViewModel : ViewModelBase
     private void SaveSettings()
     {
         var config = ConfigManager.Config;
+
+        var patchingChanged = config.PatchVrChat != PatchVRC ||
+                              config.PatchResonite != PatchResonite ||
+                              config.PatchChilloutVR != PatchChilloutVR;
 
         if (config.YtdlpWebServerUrl != WebServerUrl)
         {
@@ -272,6 +284,7 @@ public partial class SettingsViewModel : ViewModelBase
         config.CacheVrDancing = CacheVRDancing;
         config.CacheOnly = CacheOnly;
         config.PatchResonite = PatchResonite;
+        config.PatchChilloutVR = PatchChilloutVR;
         config.PatchVrChat = PatchVRC;
         config.AutoUpdateVrcVideoCacher = AutoUpdate;
         config.CloseToTray = CloseToTray;
@@ -284,6 +297,7 @@ public partial class SettingsViewModel : ViewModelBase
         config.BlockRedirect = BlockRedirect;
         config.RedirectVRDancing = RedirectVRDancing;
         ConfigManager.TrySaveConfig();
+        if (patchingChanged) FileTools.BackupAllYtdl();
         HasChanges = false;
         StatusMessage = Localizer.Get("SettingsSaved");
         StatusMessageColor = "#81C784";

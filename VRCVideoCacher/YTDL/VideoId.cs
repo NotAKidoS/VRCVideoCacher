@@ -116,7 +116,8 @@ public class VideoId
         return data.Id;
     }
 
-    public static async Task<string> GetURLResonite(string url)
+    // Full yt-dlp -J metadata dump, used by clients that pick their own format (Resonite, ChilloutVR)
+    public static async Task<string> GetUrlJson(string url)
     {
         var args = new List<string>();
         if (!string.IsNullOrEmpty(ConfigManager.Config.YtdlpDubLanguage))
@@ -138,6 +139,24 @@ public class VideoId
         }
 
         return output;
+    }
+    
+    public static string BuildUrlJsonFromCache(VideoInfo videoInfo, string url)
+    {
+        var cache = DatabaseManager.GetVideoInfoCache(videoInfo.VideoId);
+
+        // Building the absolute minimal json response for ChilloutVR to ingest.
+        // As we are not providing formats/requested formats, CVR won't attempt any
+        // manual resolving, and will just play whatever we feed it.
+        YtdlpVideoInfo info = new()
+        {
+            Id = videoInfo.VideoId,
+            Duration = cache?.Duration,
+            Name = cache?.Title ?? videoInfo.VideoId,
+            Url = url,
+        };
+
+        return JsonSerializer.Serialize(info, VideoIdJsonContext.Default.YtdlpVideoInfo);
     }
 
     public static async Task<Tuple<string, bool>> GetUrl(VideoInfo videoInfo, bool avPro)
