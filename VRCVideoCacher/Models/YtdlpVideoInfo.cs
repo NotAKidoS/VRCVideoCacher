@@ -18,6 +18,9 @@ internal class YtdlpVideoInfo
 
     [JsonPropertyName("author_name")]
     public string? Author { get; set; }
+
+    [JsonPropertyName("url")]
+    public string? Url { get; set; }
 }
 
 [JsonSerializable(typeof(YtdlpVideoInfo))]

@@ -137,7 +137,7 @@ public class ApiController : WebApiController
             Log.Information("Responding with Cached URL: {URL}", url);
 
             if (dumpJson)
-                await HttpContext.SendStringAsync(BuildCachedVideoJson(videoInfo, url, fileName), "text/plain", Encoding.UTF8);
+                await HttpContext.SendStringAsync(VideoId.BuildUrlJsonFromCache(videoInfo, url), "text/plain", Encoding.UTF8);
             else
                 await HttpContext.SendStringAsync(url, "text/plain", Encoding.UTF8);
 
@@ -228,48 +228,7 @@ public class ApiController : WebApiController
             VideoDownloader.QueueDownload(videoInfo);
         }
     }
-
-    // Minimal yt-dlp-shaped info json pointing at a locally cached file, for clients that expect -J output.
-    private static string BuildCachedVideoJson(VideoInfo videoInfo, string url, string fileName)
-    {
-        var ext = Path.GetExtension(fileName).TrimStart('.');
-        var vcodec = ext == "webm" ? "vp9" : "h264";
-        var acodec = ext == "webm" ? "opus" : "aac";
-        var cache = DatabaseManager.GetVideoInfoCache(videoInfo.VideoId);
-
-        using var stream = new MemoryStream();
-        using (var writer = new System.Text.Json.Utf8JsonWriter(stream))
-        {
-            writer.WriteStartObject();
-            writer.WriteString("id", videoInfo.VideoId);
-            writer.WriteString("title", cache?.Title ?? videoInfo.VideoId);
-            if (cache?.Duration != null)
-                writer.WriteNumber("duration", cache.Duration.Value);
-            writer.WriteString("webpage_url", videoInfo.VideoUrl);
-            writer.WriteString("extractor", "VRCVideoCacher");
-
-            void WriteFormatFields(System.Text.Json.Utf8JsonWriter w)
-            {
-                w.WriteString("format_id", "vvc-cached");
-                w.WriteString("format", "vvc-cached - VRCVideoCacher local cache");
-                w.WriteString("url", url);
-                w.WriteString("ext", ext);
-                w.WriteString("protocol", "http");
-                w.WriteString("vcodec", vcodec);
-                w.WriteString("acodec", acodec);
-            }
-
-            WriteFormatFields(writer);
-            writer.WriteStartArray("formats");
-            writer.WriteStartObject();
-            WriteFormatFields(writer);
-            writer.WriteEndObject();
-            writer.WriteEndArray();
-            writer.WriteEndObject();
-        }
-        return Encoding.UTF8.GetString(stream.ToArray());
-    }
-
+    
     private static (bool isCached, string filePath, string fileName) GetCachedFile(string videoId, bool avPro)
     {
         var ext = avPro ? "webm" : "mp4";
