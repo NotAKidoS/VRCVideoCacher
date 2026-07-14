@@ -109,6 +109,9 @@ public class FileTools
             return null;
         }
 
+        // There is an edge case where if the game was just installed it will not be detected with this method.
+        // I needed to restart Steam after installing Resonite for it to be detected by VRCVideoCacher.
+        
         try
         {
             var stream = File.OpenRead(libraryFolders);

@@ -73,14 +73,17 @@ public partial class SettingsViewModel : ViewModelBase
 
     // Patching
     [ObservableProperty]
+    private bool _patchVRC;
+    public bool IsVrChatNotDetected => !FileTools.IsVrChatInstalled;
+    
+    [ObservableProperty]
     private bool _patchResonite;
+    public bool IsResoniteNotDetected => !FileTools.IsResoniteInstalled;
 
     [ObservableProperty]
     private bool _patchChilloutVR;
-
-    [ObservableProperty]
-    private bool _patchVRC;
-
+    public bool IsChilloutVRNotDetected => !FileTools.IsChilloutVRInstalled;
+    
     [ObservableProperty]
     private bool _redirectVRDancing;
 
